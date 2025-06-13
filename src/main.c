@@ -1,3 +1,5 @@
+#define WINDOW_TITLE "SQLitein"
+
 #include "stdint.h"
 #include "stdbool.h"
 #include "assert.h"
@@ -11,19 +13,22 @@
 #endif
 #pragma warning(pop)
 
-#include "type.c"
-#include "arena.c"
-#include "debug.h"
-#include "algorithm.c"
-
-#define WINDOW_TITLE "SQLitein"
 #define SQLITE_ENABLE_MEMSYS5
 #define SQLITE3_MEMORY_BUDGET 10*MB
+#ifdef _WIN32
+  #include "winsqlite3.h"
+#endif
+
+#include "type.c"
+#include "arena.c"
+#include "enum.c"
+#include "struct.c"
+#include "debug.h"
+#include "algorithm.c"
 
 #ifdef _WIN32
   #include "windows.h"
   #include "commdlg.h"
-  #include "winsqlite3.h"
   #include "glcorearb.h"
   #include "wglext.h"
   #include "GL/gl.h"

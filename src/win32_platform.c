@@ -70,30 +70,17 @@ File Win32_ReadWholeFileEx(Arena *arena, const char* path, DWORD desiredAccess, 
 }
 #define Win32_ReadWholeFile(arena, path) ReadWholeFileEx(arena, path, GENERIC_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY)
 
-char *Win32_OpenFileDialog(Arena *arena, Win32Context *context)
-{
-  TmpArena tmpArena = {0};
-  TmpBegin(&tmpArena, arena);
-  
-  char *fileName = (char *)Alloc(arena, MAX_PATH);
-  
+i32 Win32_OpenFileDialog(Win32Context *context, char *outFilePath)
+{  
   OPENFILENAME openFileName = {
     .lStructSize = sizeof(OPENFILENAME),
     .hwndOwner = context->window,
-    .lpstrFile = fileName,
+    .lpstrFile = outFilePath,
     .nMaxFile = MAX_PATH,
     .lpstrFilter = "*.db\0",
     .nFilterIndex = 1,
     .Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST,
   };
-  
-  TmpEnd(&tmpArena);
-  
-  if (GetOpenFileName(&openFileName))
-  {
-    Log("Selected file: %s\n", fileName);
-    return fileName;
-  }
-  
-  return NULL;
+    
+  return GetOpenFileName(&openFileName) ? 0 : CommDlgExtendedError();
 }

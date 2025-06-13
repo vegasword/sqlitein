@@ -15,3 +15,6 @@ typedef double f64;
 
 typedef signed char sc; 
 typedef unsigned char uc;
+
+typedef ImVec2 v2;
+typedef ImVec4 v4;

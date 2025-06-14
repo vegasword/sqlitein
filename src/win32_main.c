@@ -14,7 +14,11 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
   SQLitein *sqlitein = New(&arena, SQLitein);
   
   Win32Context *win32 = (Win32Context *)Alloc(&arena, sizeof(Win32Context));
+  
+#if DEBUG
   InitDebugConsole();
+#endif
+
   win32->window = CreateOpenGLContext(hInst, win32);
   InitImGui(win32);
   

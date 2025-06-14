@@ -26,7 +26,7 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
   
   DEVMODE devMode = (DEVMODE) { .dmSize = sizeof(DEVMODE) };
   EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &devMode);
-  u32 desiredDelay = 1 / devMode.dmDisplayFrequency;
+  f32 desiredDelay = 1 / (f32)devMode.dmDisplayFrequency;
   
   PerfCounter deltaCounter = InitPerfCounter();
   StartPerfCounter(&deltaCounter);
@@ -36,6 +36,7 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
   for (;;)
   {
     f32 deltaTime = GetDeltaTime(&deltaCounter);
+    imguiData.frameDelay = deltaTime - desiredDelay;
     
     MSG message;
     while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE))
@@ -56,7 +57,6 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
-    imguiData.frameDelay = deltaTime - desiredDelay;
     UpdateImGui(&arena, &imguiData);
     RenderImGui();
     

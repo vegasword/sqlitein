@@ -154,13 +154,15 @@ end_menu:
         igText("%s", sqliteinErrorsMessages[error]);
       }
     }
+
+#if DEBUG
+    igText("%.2f ms", data->frameDelay);
+#endif
     
     igEndMainMenuBar();
   }
-        
-  // igEnd();
   
-  if (errorOccured) igPopStyleColor(1);  
+  if (errorOccured) igPopStyleColor(1);
   
   if (igBegin("Tables", NULL, 0))
   {
@@ -279,7 +281,7 @@ end_menu:
           sqlitein->currentTable = table;
           break;
         }
-      }        
+      }
     }
     igEnd();
   }
@@ -302,33 +304,41 @@ end_menu:
         igText("%s", table->columnsName[columnIndex]);
       }
       
-      for (u32 rowIndex = 0; rowIndex < rowsCount; ++rowIndex)
+      ImGuiListClipper *clipper = ImGuiListClipper_ImGuiListClipper();
+      ImGuiListClipper_Begin(clipper, rowsCount, 16);
+      
+      while (ImGuiListClipper_Step(clipper))
       {
-        igTableNextRow(0, 0);
-
-        for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
+        for (i32 rowIndex = clipper->DisplayStart; rowIndex < clipper->DisplayEnd; ++rowIndex)
         {
-          igTableSetColumnIndex(columnIndex);
-          igNextColumn();
-          
-          SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
+          igTableNextRow(0, 16);
 
-          switch (column->type)
+          for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
           {
-            case SQLITE_INTEGER: igText("%d", column->data.integer);     break;
-            case SQLITE_FLOAT:   igText("%f", column->data.real);        break;
-            case SQLITE_TEXT:    igText("%s", column->data.text);        break;
-            case SQLITE_BLOB:    igText("BLOB (%p)", column->data.blob); break;
-            default:             igText("NULL");                         break;
+            igTableSetColumnIndex(columnIndex);
+            igNextColumn();
+        
+            SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
+
+            switch (column->type)
+            {
+              case SQLITE_INTEGER: igText("%d", column->data.integer);     break;
+              case SQLITE_FLOAT:   igText("%f", column->data.real);        break;
+              case SQLITE_TEXT:    igText("%s", column->data.text);        break;
+              case SQLITE_BLOB:    igText("BLOB (%p)", column->data.blob); break;
+              default:             igText("NULL");                         break;
+            }
           }
         }
       }
+      
+      ImGuiListClipper_End(clipper);
 
       igEndTable();
     }
+    
+    igEnd();
   }
-  
-  igEnd();
 }
 
 void RenderImGui(void)

@@ -82,5 +82,5 @@ i32 Win32_OpenFileDialog(Win32Context *context, char *outFilePath)
     .Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST,
   };
     
-  return GetOpenFileName(&openFileName) ? 0 : CommDlgExtendedError();
+  return GetOpenFileName(&openFileName) ? 1 : CommDlgExtendedError();
 }

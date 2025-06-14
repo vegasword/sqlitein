@@ -16,7 +16,7 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
   Win32Context *win32 = (Win32Context *)Alloc(&arena, sizeof(Win32Context));
   InitDebugConsole();
   win32->window = CreateOpenGLContext(hInst, win32);
-  InitImGui(win32->window);
+  InitImGui(win32);
   
   ImGuiData imguiData = (ImGuiData) {
     .arena = &arena,
@@ -48,7 +48,6 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
       else
       {
         sqlite3_close(sqlitein->database.handle);
-        TmpEnd(&sqlitein->projectArena);
         Win32_Quit(win32);
         return 0;
       }

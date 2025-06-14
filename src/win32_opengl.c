@@ -4,7 +4,7 @@ LRESULT CALLBACK ImGuiWindowProc(HWND window, UINT msg, WPARAM wParam, LPARAM lP
 #define PFNWGL(name) PFNWGL##name##PROC
 
 #if DEBUG
-#define GL_FUNC(X) X(PFNGL(DEBUGMESSAGECALLBACK),      glDebugMessageCallback      )
+#define GL_FUNC(X) X(PFNGL(DEBUGMESSAGECALLBACK), glDebugMessageCallback)
 
 #define X(type, name) static type name;
 GL_FUNC(X)
@@ -182,8 +182,8 @@ HWND CreateOpenGLContext(HINSTANCE instance, Win32Context *context)
   assert(format);
   
   i32 contextAttribs[] = {
-    WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-    WGL_CONTEXT_MINOR_VERSION_ARB, 6,
+    WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+    WGL_CONTEXT_MINOR_VERSION_ARB, 3,
     WGL_CONTEXT_PROFILE_MASK_ARB,
     WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 #if DEBUG

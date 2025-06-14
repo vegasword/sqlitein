@@ -1,13 +1,19 @@
 typedef struct {
-  char *data;
-  u32 length;
-} String;
+  i32 type;
+  union {
+    i64 integer;
+    double real;
+    char *text;
+    void *blob;
+  } data;
+} SQLiteinColumn;
 
 typedef struct {
-  String name;
+  char *name;
   u32 rowsCount;
   u32 columnsCount;
-  //TODO: SQLiteinColumn
+  char **columnsName;
+  SQLiteinColumn *columns;
 } SQLiteinTable;
 
 typedef struct {
@@ -18,7 +24,8 @@ typedef struct {
 
 typedef struct {
   TmpArena projectArena;
+  TmpArena currentTableArena;
+  SQLiteinTable *currentTable;
   SQLiteinDB database;
   SQLiteinErrors error;
 } SQLitein;
-

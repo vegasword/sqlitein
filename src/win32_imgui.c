@@ -4,35 +4,40 @@ typedef struct  {
 } ImGui;
 
 typedef struct {  
+  f32 frameDelay;
   Arena *arena;
   Win32Context *win32;
   SQLitein *sqlitein;
-  f32 frameDelay;
-} ImGuiData;
+  ImFont *font;
+} MyImGuiContext;
 
 static const char *sqliteinErrorsMessages[] = {
   [SQLITEIN_ERROR_SQLITE] = "SQLite error",
   [SQLITEIN_ERROR_CANT_OPEN_DATABASE] = "Can't open database",
 };
 
-void InitImGui(Win32Context *context)
+void InitImGui(MyImGuiContext *context)
 {
   ImGui imgui = { .ctx = igCreateContext(NULL), .io = igGetIO() };
   imgui.io->IniFilename = NULL;
   imgui.io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   imgui.io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+  ImFontAtlas *atlas = imgui.io->Fonts;
+  File fontFile = Win32_ReadWholeFile(context->arena, "NotoSans-Regular.ttf");
+  context->font = ImFontAtlas_AddFontFromMemoryTTF(atlas, (void *)fontFile.data, fontFile.size, 16, NULL, ImFontAtlas_GetGlyphRangesDefault(atlas)); 
   
-  ImGui_ImplWin32_InitForOpenGL(context->window);
+  ImGui_ImplWin32_InitForOpenGL(context->win32->window);
   ImGui_ImplOpenGL3_Init(NULL);
-  igStyleColorsDark(NULL);
+  igStyleColorsDark(NULL);  
 }
 
 static bool dockSpaceInitialized = false;
 
-void UpdateImGui(Arena *arena, ImGuiData *data)
+void UpdateImGui(Arena *arena, MyImGuiContext *context)
 {
-  Win32Context *win32 = data->win32;
-  SQLitein *sqlitein = data->sqlitein;
+  Win32Context *win32 = context->win32;
+  SQLitein *sqlitein = context->sqlitein;
   SQLiteinDB *database = &sqlitein->database;
   SQLiteinErrors error = sqlitein->error;
   bool errorOccured = error != SQLITEIN_NO_ERROR;
@@ -40,6 +45,8 @@ void UpdateImGui(Arena *arena, ImGuiData *data)
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplWin32_NewFrame();
   igNewFrame();
+
+  igPushFont(context->font);
   
   if (igIsKeyDown_Nil(ImGuiKey_Escape))
   {
@@ -53,7 +60,7 @@ void UpdateImGui(Arena *arena, ImGuiData *data)
     ImGuiID dockSpaceCentralNodeId = igDockBuilderGetCentralNode(dockSpaceId)->ID;
     ImGuiID tablesNodeId, tableViewerNodeId;
     
-    igDockBuilderSplitNode(dockSpaceCentralNodeId, ImGuiDir_Left, 0.2f, &tablesNodeId, &tableViewerNodeId);
+    igDockBuilderSplitNode(dockSpaceCentralNodeId, ImGuiDir_Left, 0.1f, &tablesNodeId, &tableViewerNodeId);
     
     igDockBuilderDockWindow("Tables", tablesNodeId);
     igDockBuilderDockWindow("Current table", tableViewerNodeId);
@@ -124,7 +131,7 @@ void UpdateImGui(Arena *arena, ImGuiData *data)
             goto end_menu;
           }
           
-          u32 length = sqlite3_column_bytes(statement, 0);
+          u32 length = sqlite3_column_bytes(statement, 0) + 1;
           tables[i].name = (char *)Alloc(arena, length);
           memcpy(tables[i].name, sqlite3_column_text(statement, 0), length);            
         }
@@ -143,6 +150,10 @@ end_menu:
     }
 
     
+#if DEBUG
+    igText("%.2f ms", context->frameDelay);
+#endif
+
     if (errorOccured)
     {
       if (error == SQLITEIN_ERROR_SQLITE)
@@ -154,15 +165,13 @@ end_menu:
         igText("%s", sqliteinErrorsMessages[error]);
       }
     }
-
-#if DEBUG
-    igText("%.2f ms", data->frameDelay);
-#endif
     
     igEndMainMenuBar();
   }
   
   if (errorOccured) igPopStyleColor(1);
+  
+  igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, (v2){0});
   
   if (igBegin("Tables", NULL, 0))
   {
@@ -176,111 +185,98 @@ end_menu:
 
       igSeparator();
       
-      sqlite3_stmt *statement;
-      for (u32 tableIndex = 0; tableIndex < tablesCount; ++tableIndex)
+      ImGuiListClipper *clipper = ImGuiListClipper_ImGuiListClipper();
+      ImGuiListClipper_Begin(clipper, tablesCount, 0);
+
+      while (ImGuiListClipper_Step(clipper))
       {
-        SQLiteinTable *table = &tables[tableIndex];
-        if (igSelectable_Bool(table->name, false, ImGuiSelectableFlags_None, (v2){0}))
+        sqlite3_stmt *statement;
+        for (i32 tableIndex = clipper->DisplayStart; tableIndex < clipper->DisplayEnd; ++tableIndex)
         {
-          if (sqlitein->currentTableArena.cur > sqlitein->projectArena.cur)
+          SQLiteinTable *table = &tables[tableIndex];
+        
+          if (igSelectable_Bool(table->name, false, ImGuiSelectableFlags_None, (v2){0}))
           {
+            sqlitein->error = SQLITEIN_NO_ERROR;
+          
+            if (sqlitein->currentTableArena.cur > sqlitein->projectArena.cur)
+            {
+              TmpEnd(&sqlitein->currentTableArena);
+            }
+          
+            TmpBegin(&sqlitein->currentTableArena, arena);
+          
+            u32 queryLength = (u32)strlen(table->name) + 22;
+            char *query = (char *)Alloc(arena, queryLength);
+            sprintf_s(query, queryLength, "SELECT COUNT(*) FROM %s", table->name);
+          
             TmpEnd(&sqlitein->currentTableArena);
-          }
           
-          TmpBegin(&sqlitein->currentTableArena, arena);
-          
-          u32 queryLength = (u32)strlen(table->name) + 22;
-          char *query = (char *)Alloc(arena, queryLength);
-          sprintf_s(query, queryLength, "SELECT COUNT(*) FROM %s", table->name);
-          
-          TmpEnd(&sqlitein->currentTableArena);
-          
-          if (sqlite3_prepare_v2(database->handle, query, -1, &statement, 0) != SQLITE_OK)
-          {
-            sqlitein->error = SQLITEIN_ERROR_SQLITE;
-            sqlite3_finalize(statement);
-            break;
-          }
+            if (sqlite3_prepare_v2(database->handle, query, -1, &statement, 0) != SQLITE_OK)
+            {
+              sqlitein->error = SQLITEIN_ERROR_SQLITE;
+              sqlite3_finalize(statement);
+              break;
+            }
                       
-          if (sqlite3_step(statement) == SQLITE_ERROR)
-          {
-            sqlitein->error = SQLITEIN_ERROR_SQLITE;
-            sqlite3_finalize(statement);
-            break;
-          }
-      
-          u32 rowsCount = table->rowsCount = sqlite3_column_int(statement, 0);
-          
-          queryLength = (u32)strlen(table->name) + 15;
-          query = (char *)Alloc(arena, queryLength);
-          sprintf_s(query, queryLength, "SELECT * FROM %s", table->name);
-          
-          TmpEnd(&sqlitein->currentTableArena);
-          
-          if (sqlite3_prepare_v2(database->handle, query, -1, &statement, 0) != SQLITE_OK)
-          {
-            sqlitein->error = SQLITEIN_ERROR_SQLITE;
-          }
-          
-          u32 columnsCount = table->columnsCount = sqlite3_column_count(statement);
-          table->columnsName = (char **)Alloc(arena, columnsCount * sizeof(char *));
-
-          for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex)
-          {
-            const char *name = sqlite3_column_name(statement, columnIndex);
-            u32 length = (u32)strlen(name);
-            table->columnsName[columnIndex] = Alloc(arena, length + 1);
-            memcpy(table->columnsName[columnIndex], name, length);
-          }
-
-          table->columns = (SQLiteinColumn *)Alloc(arena, rowsCount * columnsCount * sizeof(SQLiteinColumn));
-          
-          for (u32 rowIndex = 0; rowIndex < rowsCount; ++rowIndex)
-          {
             if (sqlite3_step(statement) == SQLITE_ERROR)
             {
               sqlitein->error = SQLITEIN_ERROR_SQLITE;
               sqlite3_finalize(statement);
               break;
             }
-            
+      
+            u32 rowsCount = table->rowsCount = sqlite3_column_int(statement, 0);
+          
+            queryLength = (u32)strlen(table->name) + 15;
+            query = (char *)Alloc(arena, queryLength);
+            sprintf_s(query, queryLength, "SELECT * FROM %s", table->name);
+          
+            TmpEnd(&sqlitein->currentTableArena);
+          
+            if (sqlite3_prepare_v2(database->handle, query, -1, &statement, 0) != SQLITE_OK)
+            {
+              sqlitein->error = SQLITEIN_ERROR_SQLITE;
+            }
+          
+            u32 columnsCount = table->columnsCount = sqlite3_column_count(statement);
+            table->columnsName = (char **)Alloc(arena, columnsCount * sizeof(char *));
+
             for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex)
             {
-              SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
-              column->type = sqlite3_column_type(statement, columnIndex);
+              const char *name = sqlite3_column_name(statement, columnIndex);
+              u32 length = (u32)strlen(name);
+              table->columnsName[columnIndex] = (char *)Alloc(arena, length + 1);
+              memcpy(table->columnsName[columnIndex], name, length);
+            }
 
-              switch (column->type)
+            table->columns = (SQLiteinColumn *)Alloc(arena, rowsCount * columnsCount * sizeof(SQLiteinColumn));
+          
+            for (u32 rowIndex = 0; rowIndex < rowsCount; ++rowIndex)
+            {
+              if (sqlite3_step(statement) == SQLITE_ERROR)
               {
-                case SQLITE_INTEGER: {
-                  column->data.integer = sqlite3_column_int64(statement, columnIndex);
-                } break;
-                  
-                case SQLITE_FLOAT: {
-                  column->data.real = sqlite3_column_double(statement, columnIndex);
-                } break;
-                  
-                case SQLITE_TEXT: {
-                  const uc *text = sqlite3_column_text(statement, columnIndex);
-                  i32 length = sqlite3_column_bytes(statement, columnIndex);
-                  column->data.text = (char *)Alloc(arena, length + 1);
-                  memcpy(column->data.text, text, length);
-                } break;
-                  
-                case SQLITE_BLOB: {
-                  const void *blob = sqlite3_column_blob(statement, columnIndex);
-                  i32 size = sqlite3_column_bytes(statement, columnIndex);
-                  column->data.blob = Alloc(arena, size + 1);
-                  memcpy(column->data.blob, blob, size);
-                } break;
-                
-                default: break;
+                sqlitein->error = SQLITEIN_ERROR_SQLITE;
+                sqlite3_finalize(statement);
+                break;
+              }
+            
+              for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex)
+              {
+                SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
+                column->type = sqlite3_column_type(statement, columnIndex);
+              
+                char *value = (char *)sqlite3_column_text(statement, columnIndex);
+                i32 valueLength = sqlite3_column_bytes(statement, columnIndex) + 1;
+                column->value = (char *)Alloc(arena, valueLength);
+                memcpy(column->value, value, valueLength);
               }
             }
-          }
           
-          sqlitein->currentTable = table;
-          break;
-        }
+            sqlitein->currentTable = table;
+            break;
+          }
+        }  
       }
     }
     igEnd();
@@ -289,56 +285,50 @@ end_menu:
   if (igBegin("Current table", NULL, 0))
   {
     SQLiteinTable *table = sqlitein->currentTable;
-
-    if (table && igBeginTable("##", table->columnsCount, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg, (v2){0}, 0))
+    if (table)
     {
       u32 rowsCount = table->rowsCount;
       u32 columnsCount = table->columnsCount;
       
-      igTableNextRow(ImGuiTableRowFlags_Headers, 0);
-      
-      for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
-      {
-        igTableSetColumnIndex(columnIndex);
-        igNextColumn();
-        igText("%s", table->columnsName[columnIndex]);
-      }
-      
-      ImGuiListClipper *clipper = ImGuiListClipper_ImGuiListClipper();
-      ImGuiListClipper_Begin(clipper, rowsCount, 16);
-      
-      while (ImGuiListClipper_Step(clipper))
-      {
-        for (i32 rowIndex = clipper->DisplayStart; rowIndex < clipper->DisplayEnd; ++rowIndex)
-        {
-          igTableNextRow(0, 16);
-
-          for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
-          {
-            igTableSetColumnIndex(columnIndex);
-            igNextColumn();
+      if (igBeginTable("##", table->columnsCount, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit, (v2){0}, 0))
+      {            
+        ImGuiListClipper *clipper = ImGuiListClipper_ImGuiListClipper();
+        ImGuiListClipper_Begin(clipper, rowsCount, 0);
         
-            SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
+        igTableNextRow(0, 0);
+      
+        for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
+        {
+          igTableSetColumnIndex(columnIndex);
+          igNextColumn();
+          igText("%s", table->columnsName[columnIndex]);
+        }
+      
+        while (ImGuiListClipper_Step(clipper))
+        {
+          for (i32 rowIndex = clipper->DisplayStart; rowIndex < clipper->DisplayEnd; ++rowIndex)
+          {
+            igTableNextRow(0, 0);
 
-            switch (column->type)
+            for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
             {
-              case SQLITE_INTEGER: igText("%d", column->data.integer);     break;
-              case SQLITE_FLOAT:   igText("%f", column->data.real);        break;
-              case SQLITE_TEXT:    igText("%s", column->data.text);        break;
-              case SQLITE_BLOB:    igText("BLOB (%p)", column->data.blob); break;
-              default:             igText("NULL");                         break;
+              igTableSetColumnIndex(columnIndex);
+              igNextColumn();
+              igText("%s", table->columns[rowIndex * columnsCount + columnIndex].value);
             }
           }
         }
-      }
       
-      ImGuiListClipper_End(clipper);
+        ImGuiListClipper_End(clipper);
 
-      igEndTable();
+        igEndTable();
+      }
     }
-    
     igEnd();
   }
+  
+  igPopStyleVar(1);
+  igPopFont();
 }
 
 void RenderImGui(void)

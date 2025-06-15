@@ -6,8 +6,9 @@ typedef struct {
 } PerfCounter;
 
 typedef struct File {
+  u32 size;
   HANDLE handle;
-  uc *buffer;
+  uc *data;
 } File;
 
 typedef struct {

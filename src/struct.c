@@ -1,11 +1,6 @@
 typedef struct {
   i32 type;
-  union {
-    i64 integer;
-    double real;
-    char *text;
-    void *blob;
-  } data;
+  char *value;
 } SQLiteinColumn;
 
 typedef struct {

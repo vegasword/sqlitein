@@ -16,17 +16,18 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
   Win32Context *win32 = (Win32Context *)Alloc(&arena, sizeof(Win32Context));
   
 #if DEBUG
-  InitDebugConsole();
+  Win32_InitDebugConsole();
 #endif
 
   win32->window = CreateOpenGLContext(hInst, win32);
-  InitImGui(win32);
   
-  ImGuiData imguiData = (ImGuiData) {
+  MyImGuiContext myImguiContext = (MyImGuiContext) {
     .arena = &arena,
     .win32 = win32,
     .sqlitein = sqlitein
   };
+  
+  InitImGui(&myImguiContext);
   
   DEVMODE devMode = (DEVMODE) { .dmSize = sizeof(DEVMODE) };
   EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &devMode);
@@ -40,7 +41,7 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
   for (;;)
   {
     f32 deltaTime = GetDeltaTime(&deltaCounter);
-    imguiData.frameDelay = deltaTime - desiredDelay;
+    myImguiContext.frameDelay = deltaTime - desiredDelay;
     
     MSG message;
     while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE))
@@ -61,7 +62,7 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
-    UpdateImGui(&arena, &imguiData);
+    UpdateImGui(&arena, &myImguiContext);
     RenderImGui();
     
     SwapBuffers(win32->dc);

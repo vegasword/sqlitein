@@ -1,5 +1,5 @@
 #if DEBUG
-void InitDebugConsole()
+void Win32_InitDebugConsole()
 {
   AllocConsole();
   AttachConsole(GetCurrentProcessId());
@@ -8,7 +8,7 @@ void InitDebugConsole()
   SetStdHandle(STD_ERROR_HANDLE, logger);
 }
 
-void LogEx(const char *format, char *filePath, int fileLine, char *function, ...)
+void Win32_Log(const char *format, char *filePath, int fileLine, char *function, ...)
 {    
   HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
   
@@ -52,23 +52,24 @@ File Win32_ReadWholeFileEx(Arena *arena, const char* path, DWORD desiredAccess, 
 
   DWORD numberOfBytesToRead = (DWORD)largeSize.QuadPart;
   DWORD numberOfBytesRead = 0;
-
+  
   TmpArena tmpArena = {0};
   TmpBegin(&tmpArena, arena);
   
-  file.buffer = (uc *)Alloc(arena, numberOfBytesToRead);
+  file.data = (uc *)Alloc(arena, numberOfBytesToRead);
+  file.size = numberOfBytesToRead;
 
-  BOOL result = ReadFile(file.handle, file.buffer, numberOfBytesToRead, &numberOfBytesRead, NULL);
+  BOOL result = ReadFile(file.handle, file.data, numberOfBytesToRead, &numberOfBytesRead, NULL);
   assert(result && numberOfBytesToRead == numberOfBytesRead);
 
-  file.buffer[numberOfBytesRead] = '\0';
+  file.data[numberOfBytesRead] = '\0';
   
   TmpEnd(&tmpArena);
   CloseHandle(file.handle);
 
   return file;
 }
-#define Win32_ReadWholeFile(arena, path) ReadWholeFileEx(arena, path, GENERIC_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY)
+#define Win32_ReadWholeFile(arena, path) Win32_ReadWholeFileEx(arena, path, GENERIC_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY)
 
 i32 Win32_OpenFileDialog(Win32Context *context, char *outFilePath)
 {  

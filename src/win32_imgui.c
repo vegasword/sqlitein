@@ -77,69 +77,17 @@ void UpdateImGui(Arena *arena, MyImGuiContext *context)
     {
       if (igMenuItem_Bool("Open", "CTRL+O", false, true))
       {
-        sqlitein->error = SQLITEIN_NO_ERROR;
-        
         char *databasePath = "";
-        
-        i32 fileOpenResult = Win32_OpenFileDialog(win32, databasePath);
-        if (fileOpenResult != 1)
+        i32 result = Win32_OpenFileDialog(win32, databasePath);
+        if (result)
         {
-          if (fileOpenResult > 1) sqlitein->error = SQLITEIN_ERROR_CANT_OPEN_DATABASE;
-          goto end_menu;
+          SQLitein_LoadTables(arena, sqlitein, databasePath);
         }
-        
-        if (sqlite3_open(databasePath, &database->handle) != SQLITE_OK)
+        else if (result > 1)
         {
-          sqlitein->error = SQLITEIN_ERROR_SQLITE;
-          goto end_menu;
-        }
-        
-        sqlite3_stmt *statement;
-        if (sqlite3_prepare_v2(database->handle, "SELECT COUNT(*) FROM sqlite_master WHERE type='table'", -1, &statement, 0) != SQLITE_OK)
-        {
-          sqlitein->error = SQLITEIN_ERROR_SQLITE;
-          sqlite3_finalize(statement);
-          goto end_menu;
-        }
-        
-        if (sqlite3_step(statement) == SQLITE_ERROR)
-        {
-          sqlitein->error = SQLITEIN_ERROR_SQLITE;
-        }
-        
-        u32 tablesCount = database->tablesCount = sqlite3_column_int(statement, 0);
-          
-        if (sqlite3_prepare_v2(database->handle, "SELECT name FROM sqlite_master WHERE type='table'", -1, &statement, 0) != SQLITE_OK)
-        {
-          sqlitein->error = SQLITEIN_ERROR_SQLITE;
-          sqlite3_finalize(statement);
-          goto end_menu;
-        }
-        
-        TmpEnd(&sqlitein->projectArena);
-        TmpBegin(&sqlitein->projectArena, arena);
-        
-        database->tables = (SQLiteinTable *)Alloc(arena, tablesCount * sizeof(SQLiteinTable));
-        
-        SQLiteinTable *tables = database->tables;
-        for (u32 i = 0; i < tablesCount; ++i)
-        {
-          if (sqlite3_step(statement) == SQLITE_ERROR)
-          {
-            sqlitein->error = SQLITEIN_ERROR_SQLITE;
-            sqlite3_finalize(statement);
-            goto end_menu;
-          }
-          
-          u32 length = sqlite3_column_bytes(statement, 0) + 1;
-          tables[i].name = (char *)Alloc(arena, length);
-          memcpy(tables[i].name, sqlite3_column_text(statement, 0), length);            
-        }
-        
-        sqlite3_finalize(statement);
+          sqlitein->error = SQLITEIN_ERROR_CANT_OPEN_DATABASE;
+        }        
       }
-
-end_menu:
       igEndMenu();
     }
   
@@ -189,92 +137,19 @@ end_menu:
       ImGuiListClipper_Begin(clipper, tablesCount, 0);
 
       while (ImGuiListClipper_Step(clipper))
-      {
-        sqlite3_stmt *statement;
+      {        
         for (i32 tableIndex = clipper->DisplayStart; tableIndex < clipper->DisplayEnd; ++tableIndex)
         {
           SQLiteinTable *table = &tables[tableIndex];
         
           if (igSelectable_Bool(table->name, false, ImGuiSelectableFlags_None, (v2){0}))
           {
-            sqlitein->error = SQLITEIN_NO_ERROR;
-          
             if (sqlitein->currentTableArena.cur > sqlitein->projectArena.cur)
             {
               TmpEnd(&sqlitein->currentTableArena);
             }
-          
-            TmpBegin(&sqlitein->currentTableArena, arena);
-          
-            u32 queryLength = (u32)strlen(table->name) + 22;
-            char *query = (char *)Alloc(arena, queryLength);
-            sprintf_s(query, queryLength, "SELECT COUNT(*) FROM %s", table->name);
-          
-            TmpEnd(&sqlitein->currentTableArena);
-          
-            if (sqlite3_prepare_v2(database->handle, query, -1, &statement, 0) != SQLITE_OK)
-            {
-              sqlitein->error = SQLITEIN_ERROR_SQLITE;
-              sqlite3_finalize(statement);
-              break;
-            }
-                      
-            if (sqlite3_step(statement) == SQLITE_ERROR)
-            {
-              sqlitein->error = SQLITEIN_ERROR_SQLITE;
-              sqlite3_finalize(statement);
-              break;
-            }
-      
-            u32 rowsCount = table->rowsCount = sqlite3_column_int(statement, 0);
-          
-            queryLength = (u32)strlen(table->name) + 15;
-            query = (char *)Alloc(arena, queryLength);
-            sprintf_s(query, queryLength, "SELECT * FROM %s", table->name);
-          
-            TmpEnd(&sqlitein->currentTableArena);
-          
-            if (sqlite3_prepare_v2(database->handle, query, -1, &statement, 0) != SQLITE_OK)
-            {
-              sqlitein->error = SQLITEIN_ERROR_SQLITE;
-            }
-          
-            u32 columnsCount = table->columnsCount = sqlite3_column_count(statement);
-            table->columnsName = (char **)Alloc(arena, columnsCount * sizeof(char *));
-
-            for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex)
-            {
-              const char *name = sqlite3_column_name(statement, columnIndex);
-              u32 length = (u32)strlen(name);
-              table->columnsName[columnIndex] = (char *)Alloc(arena, length + 1);
-              memcpy(table->columnsName[columnIndex], name, length);
-            }
-
-            table->columns = (SQLiteinColumn *)Alloc(arena, rowsCount * columnsCount * sizeof(SQLiteinColumn));
-          
-            for (u32 rowIndex = 0; rowIndex < rowsCount; ++rowIndex)
-            {
-              if (sqlite3_step(statement) == SQLITE_ERROR)
-              {
-                sqlitein->error = SQLITEIN_ERROR_SQLITE;
-                sqlite3_finalize(statement);
-                break;
-              }
             
-              for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex)
-              {
-                SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
-                column->type = sqlite3_column_type(statement, columnIndex);
-              
-                char *value = (char *)sqlite3_column_text(statement, columnIndex);
-                i32 valueLength = sqlite3_column_bytes(statement, columnIndex) + 1;
-                column->value = (char *)Alloc(arena, valueLength);
-                memcpy(column->value, value, valueLength);
-              }
-            }
-          
-            sqlitein->currentTable = table;
-            break;
+            SQLitein_LoadTable(arena, sqlitein, table);
           }
         }  
       }
@@ -285,6 +160,7 @@ end_menu:
   if (igBegin("Current table", NULL, 0))
   {
     SQLiteinTable *table = sqlitein->currentTable;
+    
     if (table)
     {
       u32 rowsCount = table->rowsCount;

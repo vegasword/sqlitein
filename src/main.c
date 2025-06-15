@@ -25,6 +25,7 @@
 #include "struct.c"
 #include "debug.h"
 #include "algorithm.c"
+#include "sqlitein.c"
 
 #ifdef _WIN32
   #include "windows.h"

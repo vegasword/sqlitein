@@ -4,16 +4,16 @@ typedef struct {
 } SQLiteinColumn;
 
 typedef struct {
-  char *name;
   u32 rowsCount;
   u32 columnsCount;
+  char *name;
   char **columnsName;
   SQLiteinColumn *columns;
 } SQLiteinTable;
 
 typedef struct {
-  sqlite3 *handle;
   u32 tablesCount;
+  sqlite3 *handle;
   SQLiteinTable *tables;
 } SQLiteinDB;
 

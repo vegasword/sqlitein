@@ -3,58 +3,11 @@ LRESULT CALLBACK ImGuiWindowProc(HWND window, UINT msg, WPARAM wParam, LPARAM lP
 #define PFNGL(name) PFNGL##name##PROC
 #define PFNWGL(name) PFNWGL##name##PROC
 
-#if DEBUG
 #define GL_FUNC(X) X(PFNGL(DEBUGMESSAGECALLBACK), glDebugMessageCallback)
 
 #define X(type, name) static type name;
 GL_FUNC(X)
 #undef X
-
-#define GL_DEBUG_CASE(buffer, category, subcategory) \
-  case GL_DEBUG_##category##_##subcategory##: \
-    strncpy_s(buffer, 32, #subcategory, sizeof(#subcategory) - 1); \
-    break
-    
-#pragma warning(push)
-#pragma warning(disable: 4100)
-void APIENTRY glDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *user)
-{
-  if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
-  
-  char sourceStr[32];
-  switch (source)
-  {
-    GL_DEBUG_CASE(sourceStr, SOURCE, API);
-    GL_DEBUG_CASE(sourceStr, SOURCE, WINDOW_SYSTEM);
-    GL_DEBUG_CASE(sourceStr, SOURCE, SHADER_COMPILER);
-    GL_DEBUG_CASE(sourceStr, SOURCE, THIRD_PARTY);
-    GL_DEBUG_CASE(sourceStr, SOURCE, APPLICATION);
-    GL_DEBUG_CASE(sourceStr, SOURCE, OTHER);
-  }
-
-  char typeStr[32];
-  switch (type)
-  {
-    GL_DEBUG_CASE(typeStr, TYPE, ERROR);
-    GL_DEBUG_CASE(typeStr, TYPE, DEPRECATED_BEHAVIOR);
-    GL_DEBUG_CASE(typeStr, TYPE, UNDEFINED_BEHAVIOR);
-    GL_DEBUG_CASE(typeStr, TYPE, PORTABILITY);
-    GL_DEBUG_CASE(typeStr, TYPE, PERFORMANCE);
-    GL_DEBUG_CASE(typeStr, TYPE, OTHER);
-    default: break;
-  }
-
-  char severityStr[32];
-  switch (severity)
-  {
-    GL_DEBUG_CASE(severityStr, SEVERITY, LOW);
-    GL_DEBUG_CASE(severityStr, SEVERITY, MEDIUM);
-    GL_DEBUG_CASE(severityStr, SEVERITY, HIGH);
-  }
-  Log("[OPENGL] [%s/%s/%s] %s\n", sourceStr, typeStr, severityStr, message);
-}
-#pragma warning(pop)
-#endif
 
 static PFNWGL(SWAPINTERVALEXT) wglSwapIntervalEXT = NULL;
 static PFNWGL(CHOOSEPIXELFORMATARB) wglChoosePixelFormatARB = NULL;
@@ -206,10 +159,6 @@ HWND CreateOpenGLContext(HINSTANCE instance, Win32Context *context)
   GL_FUNC(X)
 #undef X
   
-#if DEBUG
-  glDebugMessageCallback(&glDebugCallback, context);
-  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-#endif
   wglSwapIntervalEXT(1);
   
   ShowWindow(window, SW_MAXIMIZE);

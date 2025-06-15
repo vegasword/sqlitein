@@ -166,31 +166,40 @@ void UpdateImGui(Arena *arena, MyImGuiContext *context)
       u32 rowsCount = table->rowsCount;
       u32 columnsCount = table->columnsCount;
       
-      if (igBeginTable("##", table->columnsCount, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit, (v2){0}, 0))
-      {            
+      if (igBeginTable("##", table->columnsCount, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollX, (v2){0}, 0))
+      {
         ImGuiListClipper *clipper = ImGuiListClipper_ImGuiListClipper();
         ImGuiListClipper_Begin(clipper, rowsCount, 0);
-        
-        igTableNextRow(0, 0);
-      
-        for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
-        {
-          igTableSetColumnIndex(columnIndex);
-          igNextColumn();
-          igText("%s", table->columnsName[columnIndex]);
-        }
-      
+                
         while (ImGuiListClipper_Step(clipper))
         {
           for (i32 rowIndex = clipper->DisplayStart; rowIndex < clipper->DisplayEnd; ++rowIndex)
           {
             igTableNextRow(0, 0);
-
-            for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
+            
+            if (clipper->DisplayStart != 1 && rowIndex == clipper->DisplayStart)
             {
-              igTableSetColumnIndex(columnIndex);
-              igNextColumn();
-              igText("%s", table->columns[rowIndex * columnsCount + columnIndex].value);
+              for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
+              {                
+                igTableSetColumnIndex(columnIndex);
+                igNextColumn();
+                
+                ImU32 headerColor = igGetColorU32_Vec4((v4){0.42f, 0.42f, 0.42f, 1});
+                igTableSetBgColor(ImGuiTableBgTarget_CellBg, headerColor, columnIndex);
+                
+                igText("%s", table->columnsName[columnIndex]);
+              }
+            }
+            else
+            {
+              for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
+              {
+                igTableSetColumnIndex(columnIndex);
+                igNextColumn();
+                
+                SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
+                igText("%s", column->type == SQLITE_NULL ? "NULL" : column->value);
+              }
             }
           }
         }

@@ -123,6 +123,11 @@ void SQLitein_LoadTable(Arena *arena, SQLitein *sqlitein, SQLiteinTable *table)
     {
       SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
       column->type = sqlite3_column_type(statement, columnIndex);
+
+      if (column->type == SQLITE_NULL)
+      {
+        continue;
+      }
   
       char *value = (char *)sqlite3_column_text(statement, columnIndex);
       i32 valueLength = sqlite3_column_bytes(statement, columnIndex) + 1;

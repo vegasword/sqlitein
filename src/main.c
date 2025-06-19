@@ -1,5 +1,7 @@
 #define WINDOW_TITLE "SQLitein"
+#define IDLE_MODE_TIMER_MS 5000
 
+#include "stdlib.h"
 #include "stdint.h"
 #include "stdbool.h"
 #include "assert.h"

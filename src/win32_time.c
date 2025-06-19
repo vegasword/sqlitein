@@ -16,7 +16,7 @@ void EndPerfCounter(PerfCounter *pc)
   pc->elapsedMilliseconds = ((pc->t2.QuadPart - pc->t1.QuadPart) * 1000) / pc->frequency.QuadPart;
 }
 
-f32 GetDeltaTime(PerfCounter *pc)
+f32 UpdateDeltaTime(PerfCounter *pc)
 {
   EndPerfCounter(pc);
   pc->t1.QuadPart = pc->t2.QuadPart;

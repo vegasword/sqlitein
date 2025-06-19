@@ -14,7 +14,6 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
   SQLitein *sqlitein = New(&arena, SQLitein);
   
   Win32Context *win32 = (Win32Context *)Alloc(&arena, sizeof(Win32Context));
-  
 #if DEBUG
   Win32_InitDebugConsole();
 #endif
@@ -31,25 +30,35 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
   
   DEVMODE devMode = (DEVMODE) { .dmSize = sizeof(DEVMODE) };
   EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &devMode);
-  f32 desiredDelay = 1 / (f32)devMode.dmDisplayFrequency;
+  f32 desiredDelay = 1 / (f32)devMode.dmDisplayFrequency; //TODO: Should be updatd when changing display device
   
   PerfCounter deltaCounter = InitPerfCounter();
   StartPerfCounter(&deltaCounter);
 
   TmpBegin(&sqlitein->projectArena, &arena);
   
+  bool idling = true;
+  f32 chronoBeforeIdling = 0;
   for (;;)
   {
-    f32 deltaTime = GetDeltaTime(&deltaCounter);
+    f32 deltaTime = UpdateDeltaTime(&deltaCounter);
     myImguiContext.frameDelay = deltaTime - desiredDelay;
     
-    MSG message;
-    while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE))
-    {      
+    MSG msg;
+    bool input = false;
+    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+    {
       if (!win32->quitting)
       {
-        TranslateMessage(&message);
-        DispatchMessage(&message);
+        if (msg.message == WM_MOUSEMOVE || msg.message == WM_MBUTTONDOWN || msg.message == WM_MOUSEWHEEL || msg.message == WM_KEYDOWN)
+        {
+          input = true;
+          idling = false;
+          chronoBeforeIdling = 0;
+        }
+        
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
       }
       else
       {
@@ -57,6 +66,27 @@ i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdsh
         Win32_Quit(win32);
         return 0;
       }
+    }
+    
+    if (idling)
+    {
+      Sleep(60);
+    }
+    else if (!input && !idling)
+    {
+      chronoBeforeIdling += deltaTime;
+      if (chronoBeforeIdling > IDLE_MODE_TIMER_MS)
+      {
+        idling = true;
+      }
+    }
+    
+    RECT clientRect;
+    GetClientRect(win32->window, &clientRect);
+    if (clientRect.right == 0 || clientRect.bottom == 0)
+    {
+      SwapBuffers(win32->dc);
+      continue;
     }
     
     glClearColor(0, 0, 0, 0);

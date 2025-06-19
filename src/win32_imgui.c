@@ -14,6 +14,7 @@ typedef struct {
 static const char *sqliteinErrorsMessages[] = {
   [SQLITEIN_ERROR_SQLITE] = "SQLite error",
   [SQLITEIN_ERROR_CANT_OPEN_DATABASE] = "Can't open database",
+  [SQLITEIN_ERROR_UNSUPPORTED_VALUE] = "BLOB and NULL values are unsupported for now",
 };
 
 void InitImGui(MyImGuiContext *context)
@@ -142,13 +143,8 @@ void UpdateImGui(Arena *arena, MyImGuiContext *context)
         {
           SQLiteinTable *table = &tables[tableIndex];
         
-          if (igSelectable_Bool(table->name, false, ImGuiSelectableFlags_None, (v2){0}))
-          {
-            if (sqlitein->currentTableArena.cur > sqlitein->projectArena.cur)
-            {
-              TmpEnd(&sqlitein->currentTableArena);
-            }
-            
+          if (igSelectable_Bool(table->name, false, ImGuiSelectableFlags_None, (v2){0}) && sqlitein->currentTable != table)
+          {            
             SQLitein_LoadTable(arena, sqlitein, table);
           }
         }  
@@ -177,7 +173,7 @@ void UpdateImGui(Arena *arena, MyImGuiContext *context)
         
         for (u32 columnIndex = 0; columnIndex < columnsCount; ++columnIndex) 
         {
-          igTableSetupColumn(table->columnsName[columnIndex], ImGuiTableColumnFlags_WidthStretch, 0, igGetID_Str("##Table view"));
+          igTableSetupColumn(table->columnsNames[columnIndex], ImGuiTableColumnFlags_WidthStretch, 0, igGetID_Str("##Table view"));
         }
         
         igTableHeadersRow();
@@ -203,12 +199,32 @@ void UpdateImGui(Arena *arena, MyImGuiContext *context)
               v2 contentRegionAvailable;
               igGetContentRegionAvail(&contentRegionAvailable);
               igSetNextItemWidth(contentRegionAvailable.x);
-              igInputText("##", column->value, strlen(column->value) + 1, 0, NULL, NULL);
 
+              char buffer[KB] = {0};
+              memcpy(buffer, column->value, strlen(column->value));
+              
+              if (sqlitein->nextRowIndex == rowIndex && sqlitein->nextColumnIndex == (i32)columnIndex)
+              {
+                sqlitein->nextRowIndex = -1;
+                sqlitein->nextColumnIndex = -1;
+                igSetKeyboardFocusHere(0);
+              }
+              
+              if (igInputText("##", buffer, KB, 0, NULL, NULL))
+              {
+                if (igIsKeyPressed_Bool(ImGuiKey_Enter, false))
+                {
+                  sqlitein->nextRowIndex = rowIndex + 1;
+                  sqlitein->nextColumnIndex = columnIndex;
+                  SQLitein_UpdateColumn(arena, sqlitein, rowIndex, columnIndex, table->columnsTypes[columnIndex], (char *)&buffer);
+                }
+              }
+              
               igPopID();
             }
           }
         }
+        
         
         ImGuiListClipper_End(clipper);
         igPopStyleVar(4);

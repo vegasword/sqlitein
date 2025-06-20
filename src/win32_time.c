@@ -1,4 +1,4 @@
-PerfCounter InitPerfCounter(void)
+PerfCounter InitPerfCounter()
 {
   PerfCounter pc = (PerfCounter){0};
   QueryPerformanceFrequency(&pc.frequency);

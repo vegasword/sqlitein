@@ -130,15 +130,19 @@ void SQLitein_LoadTable(Arena *arena, SQLitein *sqlitein, SQLiteinTable *table)
       SQLiteinColumn *column = &table->columns[rowIndex * columnsCount + columnIndex];
       i32 columnType = table->columnsTypes[columnIndex] = sqlite3_column_type(statement, columnIndex);
 
+  
       if (columnType == SQLITE_NULL)
       {
-        continue;
+        column->value = (char *)Alloc(arena, 5);
+        memcpy(column->value, "NULL", 4);
       }
-  
-      char *value = (char *)sqlite3_column_text(statement, columnIndex);
-      i32 valueLength = sqlite3_column_bytes(statement, columnIndex) + 1;
-      column->value = (char *)Alloc(arena, valueLength);
-      memcpy(column->value, value, valueLength);
+      else
+      {
+        char *value = (char *)sqlite3_column_text(statement, columnIndex);
+        i32 valueLength = sqlite3_column_bytes(statement, columnIndex) + 1;
+        column->value = (char *)Alloc(arena, valueLength);
+        memcpy(column->value, value, valueLength);
+      }
     }
   }
 

@@ -203,20 +203,21 @@ void UpdateImGui(Arena *arena, MyImGuiContext *context)
               char buffer[KB] = {0};
               memcpy(buffer, column->value, strlen(column->value));
               
-              if (sqlitein->nextRowIndex == rowIndex && sqlitein->nextColumnIndex == (i32)columnIndex)
+              if (sqlitein->nextRowIndex == rowIndex)
               {
                 sqlitein->nextRowIndex = -1;
-                sqlitein->nextColumnIndex = -1;
                 igSetKeyboardFocusHere(0);
               }
+
+              i32 columnType = table->columnsTypes[columnIndex];
               
-              if (igInputText("##", buffer, KB, 0, NULL, NULL))
+              ImGuiInputTextFlags decimalInput = columnType == SQLITE_INTEGER || columnType == SQLITE_FLOAT ? ImGuiInputTextFlags_CharsDecimal : 0;
+              if (igInputText("##", buffer, KB, ImGuiInputTextFlags_EnterReturnsTrue | decimalInput, NULL, NULL))
               {
                 if (igIsKeyPressed_Bool(ImGuiKey_Enter, false))
                 {
                   sqlitein->nextRowIndex = rowIndex + 1;
-                  sqlitein->nextColumnIndex = columnIndex;
-                  SQLitein_UpdateColumn(arena, sqlitein, rowIndex, columnIndex, table->columnsTypes[columnIndex], (char *)&buffer);
+                  SQLitein_UpdateColumn(arena, sqlitein, rowIndex, columnIndex, columnType, (char *)&buffer);
                 }
               }
               

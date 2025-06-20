@@ -16,7 +16,6 @@
 #pragma warning(pop)
 
 #define SQLITE_ENABLE_MEMSYS5
-#define SQLITE3_MEMORY_BUDGET 10*MB
 #ifdef _WIN32
   #include "winsqlite3.h"
 #endif

@@ -1,3 +1,5 @@
+#define HasError(result) result != SQLITE_ROW && result != SQLITE_OK && result != SQLITE_DONE
+
 void SQLitein_LoadTables(Arena *arena, SQLitein *sqlitein, char *databasePath)
 {
   SQLiteinDB *database = &sqlitein->database;
@@ -18,7 +20,8 @@ void SQLitein_LoadTables(Arena *arena, SQLitein *sqlitein, char *databasePath)
     return;
   }
 
-  if (sqlite3_step(statement) == SQLITE_ERROR)
+  u32 result = sqlite3_step(statement);
+  if (HasError(result))
   {
     sqlitein->error = SQLITEIN_ERROR_SQLITE;
     sqlite3_finalize(statement);
@@ -42,7 +45,8 @@ void SQLitein_LoadTables(Arena *arena, SQLitein *sqlitein, char *databasePath)
   SQLiteinTable *tables = database->tables;
   for (u32 i = 0; i < tablesCount; ++i)
   {
-    if (sqlite3_step(statement) == SQLITE_ERROR)
+    result = sqlite3_step(statement);
+    if (HasError(result))
     {
       sqlitein->error = SQLITEIN_ERROR_SQLITE;
       sqlite3_finalize(statement);
@@ -82,7 +86,8 @@ void SQLitein_LoadTable(Arena *arena, SQLitein *sqlitein, SQLiteinTable *table)
     return;
   }
           
-  if (sqlite3_step(statement) == SQLITE_ERROR)
+  u32 result = sqlite3_step(statement);
+  if (HasError(result))
   {
     sqlitein->error = SQLITEIN_ERROR_SQLITE;
     sqlite3_finalize(statement);
@@ -118,7 +123,8 @@ void SQLitein_LoadTable(Arena *arena, SQLitein *sqlitein, SQLiteinTable *table)
 
   for (u32 rowIndex = 0; rowIndex < rowsCount; ++rowIndex)
   {
-    if (sqlite3_step(statement) == SQLITE_ERROR)
+    result = sqlite3_step(statement);
+    if (HasError(result))
     {
       sqlitein->error = SQLITEIN_ERROR_SQLITE;
       sqlite3_finalize(statement);
@@ -168,7 +174,7 @@ void SQLitein_UpdateColumn(Arena *arena, SQLitein *sqlitein, i32 rowIndex, i32 c
   _itoa_s(rowIndex, rowIndexStr, 13, 10);
   u32 queryLength =  tableNameLength + (u32)strlen(rowIndexStr) + 52;
   char *query = (char *)Alloc(arena, queryLength);
-  sprintf_s(query, queryLength, "SELECT ROWID FROM %s ORDER BY ROWID LIMIT 1 OFFSET %s", tableName, rowIndexStr); //BUG: This doesn't work if two values are the same column of multiples rows
+  sprintf_s(query, queryLength, "SELECT ROWID FROM %s ORDER BY ROWID LIMIT 1 OFFSET %s", tableName, rowIndexStr);
 
   if (sqlite3_prepare_v2(database->handle, query, -1, &statement, 0) != SQLITE_OK)
   {
@@ -178,7 +184,8 @@ void SQLitein_UpdateColumn(Arena *arena, SQLitein *sqlitein, i32 rowIndex, i32 c
   }
   
   i32 sqliteRowId = -1;
-  if (sqlite3_step(statement) == SQLITE_ERROR)
+  u32 result = sqlite3_step(statement);
+  if (HasError(result))
   {
     sqlitein->error = SQLITEIN_ERROR_SQLITE;
     sqlite3_finalize(statement);
@@ -221,7 +228,8 @@ void SQLitein_UpdateColumn(Arena *arena, SQLitein *sqlitein, i32 rowIndex, i32 c
     return;
   }
   
-  if (sqlite3_step(statement) == SQLITE_ERROR)
+  result = sqlite3_step(statement);
+  if (HasError(result))
   {
     sqlitein->error = SQLITEIN_ERROR_SQLITE;
     sqlite3_finalize(statement);

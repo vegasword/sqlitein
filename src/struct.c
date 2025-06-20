@@ -19,7 +19,6 @@ typedef struct {
 
 typedef struct {
   i32 nextRowIndex;
-  i32 nextColumnIndex;
   TmpArena projectArena;
   TmpArena currentViewArena;
   SQLiteinTable *currentTable;

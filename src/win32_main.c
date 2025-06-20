@@ -1,15 +1,9 @@
-#define SQLITE_CHECK(db, result, value, message) if (result != value) Log("%s: %s\n", message, sqlite3_errstr(sqlite3_extended_errcode(db)));
-
 i32 WINAPI WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
 {
   hInstPrev; cmdline; cmdshow; // To avoid stupid MSVC warning
   
   Arena arena;
   Init(&arena, VirtualAlloc(NULL, 2*GB, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE), 2*GB);
-  {
-    void *sqlite3Buffer = Alloc(&arena, SQLITE3_MEMORY_BUDGET);
-    sqlite3_config(SQLITE_CONFIG_HEAP, sqlite3Buffer, SQLITE3_MEMORY_BUDGET, DEFAULT_ALIGNMENT);
-  }
       
   SQLitein *sqlitein = New(&arena, SQLitein);
   
